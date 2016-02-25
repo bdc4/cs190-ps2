@@ -112,9 +112,156 @@ class CPUState {
     // Make use of the enums RegisterASpecialValues and RegisterBSpecialValues so that you don't have to hard
     // code "2" to mean a decimal point (similarly for the other special values).
     func canonicalize() {
-        let registerC = Register(fromDecimalString: "01000000000002")
-        registers[RegId.C.rawValue] = registerC
+        
+        let nibblesA = registers[RegId.A.rawValue].nibbles
+        let nibblesB = registers[RegId.B.rawValue].nibbles
+        let exponentIsPositive = nibblesA[2] != RegisterASpecialValues.Minus.rawValue
+        
+        let exp1 = nibblesA[0]
+        let exp10 = nibblesA[1]
+        let exponent = exp1 + exp10*10
+        var newExponent = Int(exponent)
+        var decimalPlace: Int = 0
+        var nonzeroPlace: Int = 0
+        var moveDecimal: Int
+        var cRegString: String = ""
+        var nineIndex: Int = 0
+        
+        for i in (ExponentLength ... RegisterLength-2).reverse() {
+            if nibblesA[i] != 0
+            {
+                nonzeroPlace = i
+            }
+        }
+        
+        for i in 0 ..< RegisterLength
+        {
+            if nibblesB[i] == RegisterBSpecialValues.Point.rawValue
+            {
+                decimalPlace = i
+            }
+        }
+        
+        moveDecimal = nonzeroPlace - decimalPlace
+        
+        if exponentIsPositive
+        {
+            newExponent += moveDecimal
+            if moveDecimal > 0
+            {
+                if newExponent < 10
+                {
+                    cRegString = "00" + String(newExponent)
+                }
+                
+                else
+                {
+                    cRegString = "0" + String(newExponent)
+                }
+            }
+            
+            else
+            {
+                if newExponent >= 0 && newExponent < 10
+                {
+                    cRegString = "00" + String(newExponent)
+                }
+                else if newExponent >= 10
+                {
+                    cRegString = "0" + String(newExponent)
+                }
+                else
+                {
+                    newExponent = 100 + newExponent
+                    if newExponent < 10
+                    {
+                        cRegString = "90" + String(newExponent)
+                    }
+                    else
+                    {
+                        cRegString = "9" + String(newExponent)
+                    }
+                }
+            }
+        }
+        
+        else {
+            newExponent = -1 * newExponent + moveDecimal
+            if moveDecimal > 0
+            {
+                if newExponent >= 0 && newExponent < 10
+                {
+                    cRegString = "00" + String(newExponent)
+                }
+            
+                else if newExponent >= 10
+                {
+                    cRegString = "0" + String(newExponent)
+                }
+                
+                else
+                {
+                    newExponent = 100 + newExponent
+                    if newExponent < 10
+                    {
+                        cRegString = "90" + String(newExponent)
+                    }
+                    else
+                    {
+                        cRegString = "9" + String(newExponent)
+                    }
+                }
+            }
+                
+            else
+            {
+                newExponent = 100 + newExponent
+                if newExponent < 10
+                {
+                    cRegString = "90" + String(newExponent)
+                }
+                
+                else
+                {
+                    cRegString = "9" + String(newExponent)
+                }
+            }
+        }
+        
+        for i in (1 ... 12).reverse() {
+            if nibblesB[i] == 9
+            {
+                cRegString = "0" + cRegString
+                nineIndex = i+1
+            }
+            
+        for i in nineIndex ... 12
+            {
+                cRegString = String(nibblesA[i]) + cRegString
+            }
+        if nibblesA[13] == 9
+            {
+                cRegString = "9" + cRegString
+            }
+        else
+            {
+                cRegString = "0" + cRegString
+            }
+        }
+    
+        //For every 9 in nibbleB, you will do cRegString = "0" + cRegString
+        //You will have to save the index of the last 9 and add 1 to that index
+        //Go through nibbleA staring from the saved index up to index 12 (less than 13)
+        //Do cRegString = String(nibblesA[i]) + cRegString
+        //for the last index, if or else: if nibblesA[13] == 9 
+        //{ cRegString = "9" + cRegString }
+        //else {cRegString = "0" + cRegString}
+        
+        let nibblesC = Register(fromDecimalString: cRegString)
+        registers[RegId.C.rawValue] = nibblesC
+        
     }
+    
     
     // Displays positive or negative overflow value
     func overflow(positive: Bool) {
